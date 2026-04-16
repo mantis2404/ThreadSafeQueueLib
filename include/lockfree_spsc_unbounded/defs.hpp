@@ -28,25 +28,43 @@ private:
   using node = tsfqueue::__utils::Lockless_Node<T>;
 
   // Add the private members :
-  // 1. node* head;
-  // 2. node* tail;
-
+ alignas(64) node* head;
+ alignas(64) node* tail;
+ alignas(64) std::atomic<size_t> capacity{0};
   // Description of priavte members :
   // 1. node* head -> Pointer to the head node
   // 2. node* tail -> Pointer to tail node
-  // 3. Cache align 1-2
+  // 3. size_t size -> to track the size of the queue
+  // 4. Cache align 1-2
 
 public:
   // Public member functions :
   // Add relevant constructors and destructors -> Add these here only
-  // 1. void push(value) : Pushes the value inside the queue, copies the value
-  // 2. void wait_and_pop(value ref) : Blocking wait on queue, returns value in
-  // the reference passed as parameter
-  // 3. bool try_pop(value ref) : Returns true and
-  // gives the value in reference passed, false otherwise
-  // 4. bool empty() : Returns
-  // whether the queue is empty or not at that instant
-  // 5. bool peek(value ref) : Returns the front/top element of queue in ref (false if empty queue)
+  lockfree_spsc_unbounded(){
+    head=new node;
+    // no heavy memory orderd like _release used since the queue is being made rn hence can directly fetch from the cache
+    head->next.store(nullptr, std::memory_order_relaxed);
+    tail=head;
+  }
+  ~lockfree_spsc_unbounded(){
+    node* curr=head;
+    while(curr!=nullptr){
+        node* next=curr->next.load(std::memory_order_relaxed);
+        delete curr;
+        curr=next;
+    }
+  }
+  // Pushes the value inside the queue, copies the value
+  void push(T value);
+  //Blocking wait on queue, returns value in the reference passed as parameter
+  void wait_and_pop(T &value);
+  // Returns true and gives the value in reference passed, false otherwise
+  bool try_pop(T &value);
+  // Returns whether the queue is empty or not at that instant
+  bool empty();
+  // Returns the front/top element of queue in ref (false if empty queue)
+  bool peek(T &value);
+  size_t size();
   // 6. Add static asserts
   // 7. Add emplace_back using perfect forwarding and variadic templates (you
   // can use this in push then)

@@ -3,18 +3,59 @@
 
 #include "defs.hpp"
 
-template <typename T>
-using queue = tsfqueue::__impl::lockfree_spsc_unbounded<T>;
+namespace tsfqueue::__impl {
+    template <typename T>
+    void lockfree_spsc_unbounded<T>::push(T value) {
+    }
+    
+    template <typename T>
+    bool lockfree_spsc_unbounded<T>::try_pop(T &value) {
+        node* curr_head=head;
+        node* next_head=head->next.load(std::memory_order_acquire);
+        
+        if(next_head==nullptr)
+            return false;
+            
+        delete curr_head;
+        head=next_head;
+        capacity.fetch_sub(1, std::memory_order_relaxed);
+        return true;
+    }
+    
+    template <typename T>
+    void lockfree_spsc_unbounded<T>::wait_and_pop(T &value) {
+        node* curr_head=head;
+        node* new_head=nullptr;
 
-template <typename T> void queue<T>::push(T value) {}
+        while(new_head==nullptr){
+            new_head=head->next.load(std::memory_order_acquire);
+        }
+            
+        delete curr_head;
+        head=new_head;
+        capacity.fetch_sub(1, std::memory_order_relaxed);
+    }
+    
+    template <typename T>
+    bool lockfree_spsc_unbounded<T>::peek(T &value) {
+        if(head->next.load(std::memory_order_acquire)==nullptr)
+            return false;
+            
+        value=head->data;
+        return true;
+    }
+    
+    template <typename T> bool lockfree_spsc_unbounded<T>::empty() {
+        if(head->next.load(std::memory_order_acquire)==nullptr)
+            return false;
+        
+        return true;
+    }
 
-template <typename T> bool queue<T>::try_pop(T &value) {}
-
-template <typename T> void queue<T>::wait_and_pop(T &value) {}
-
-template <typename T> bool queue<T>::peek(T &value) {}
-
-template <typename T> bool queue<T>::empty(void) {}
+    template <typename T> size_t lockfree_spsc_unbounded<T>::size() {
+        return capacity.load(std::memory_order_relaxed);
+    }
+}
 
 #endif
 
