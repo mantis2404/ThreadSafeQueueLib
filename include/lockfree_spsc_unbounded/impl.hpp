@@ -6,15 +6,9 @@
 namespace tsfqueue::__impl {
     template <typename T>
     void lockfree_spsc_unbounded<T>::push(T value) {
-        node* new_node=new node;
-        new_node->data=std::move(value); // faster
+        emplace_back(std::move(value));
         // no extra copies of value made, the pointer is directly moved to the new node,
         // the value is destroyed at the end of the scope.
-        
-        node* prev_tail=tail.load(std::memory_order_relaxed);
-        prev_tail->next.store(new_node, std::memory_order_release);
-        tail=new_node;
-        capacity.fetch_add(1, std::memory_order_relaxed);
     }
     
     template <typename T>
@@ -63,6 +57,21 @@ namespace tsfqueue::__impl {
 
     template <typename T> size_t lockfree_spsc_unbounded<T>::size() {
         return capacity.load(std::memory_order_relaxed);
+    }
+
+    template <typename T>
+    template <typename... Args>
+    void lockfree_spsc_unbounded<T>::emplace_back(Args&&... args) {
+    
+        node* new_node=new node();
+        new_node->data=T(std::forward<Args>(args)...); 
+        new_node->next.store(nullptr, std::memory_order_relaxed);
+
+        node* prev_tail=tail.load(std::memory_order_relaxed);
+        prev_tail->next.store(new_node, std::memory_order_release); 
+
+        capacity.fetch_add(1, std::memory_order_relaxed);
+        tail=new_node;
     }
 }
 

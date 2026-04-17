@@ -34,7 +34,7 @@ private:
   // Description of priavte members :
   // 1. node* head -> Pointer to the head node
   // 2. node* tail -> Pointer to tail node
-  // 3. size_t size -> to track the size of the queue
+  // 3. size_t capacity -> to track the size of the queue
   // 4. Cache align 1-2
 
 public:
@@ -65,6 +65,7 @@ public:
   // Returns the front/top element of queue in ref (false if empty queue)
   bool peek(T &value);
   size_t size();
+  template <typename... Args> void emplace_back(Args &&...args);
   // 6. Add static asserts
   // 7. Add emplace_back using perfect forwarding and variadic templates (you
   // can use this in push then)
