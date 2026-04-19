@@ -28,9 +28,9 @@ private:
   using node = tsfqueue::__utils::Lockless_Node<T>;
 
   // Add the private members :
- alignas(64) node* head;
- alignas(64) node* tail;
- alignas(64) std::atomic<size_t> capacity{0};
+ alignas(cache_line_size) std::atomic<node*> head;
+ alignas(cache_line_size) std::atomic<node*> tail;
+ alignas(cache_line_size) std::atomic<size_t> capacity{0};
   // Description of priavte members :
   // 1. node* head -> Pointer to the head node
   // 2. node* tail -> Pointer to tail node
@@ -41,14 +41,17 @@ public:
   // Public member functions :
   // Add relevant constructors and destructors -> Add these here only
   lockfree_spsc_unbounded(){
-    head=new node;
+    node* dummy = new node;
+    dummy->next.store(nullptr, std::memory_order_relaxed);
     // no heavy memory orderd like _release used since the queue is being made rn hence can directly fetch from the cache
-    head->next.store(nullptr, std::memory_order_relaxed);
-    tail=head;
+    head.store(dummy, std::memory_order_relaxed);
+    tail.store(dummy, std::memory_order_relaxed);
   }
   ~lockfree_spsc_unbounded(){
-    node* curr=head;
+    // head is atomic so we load it first
+    node* curr=head.load(std::memory_order_relaxed);
     while(curr!=nullptr){
+        // curr->next is also atomic so we need to load it also
         node* next=curr->next.load(std::memory_order_relaxed);
         delete curr;
         curr=next;

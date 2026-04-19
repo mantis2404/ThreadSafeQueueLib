@@ -3,6 +3,9 @@
 
 #include "defs.hpp"
 
+// since the nodes are atomic we need to use .load(memory_order_relaxed) to first fetch it an then perform operations on it
+// to assign a value we will have to do .store()
+// not to use = with atomics
 namespace tsfqueue::__impl {
     template <typename T>
     void lockfree_spsc_unbounded<T>::push(T value) {
@@ -19,40 +22,41 @@ namespace tsfqueue::__impl {
         if(next_head==nullptr)
             return false;
             
+        value=next_head->data;
         delete curr_head;
-        head=next_head;
+        head.store(next_head, std::memory_order_relaxed);
         capacity.fetch_sub(1, std::memory_order_relaxed);
         return true;
     }
     
     template <typename T>
     void lockfree_spsc_unbounded<T>::wait_and_pop(T &value) {
-        node* curr_head=head;
+        node* curr_head=head.load(std::memory_order_relaxed);
         node* new_head=nullptr;
 
         while(new_head==nullptr){
-            new_head=head->next.load(std::memory_order_acquire);
+            new_head=head.load(std::memory_order_relaxed)->next.load(std::memory_order_acquire);
         }
             
         delete curr_head;
-        head=new_head;
+        head.store(new_head, std::memory_order_relaxed);
         capacity.fetch_sub(1, std::memory_order_relaxed);
     }
     
     template <typename T>
     bool lockfree_spsc_unbounded<T>::peek(T &value) {
-        if(head->next.load(std::memory_order_acquire)==nullptr)
+        if(head.load(std::memory_order_relaxed)->next.load(std::memory_order_acquire)==nullptr)
             return false;
             
-        value=head->data;
+        value=head.load(std::memory_order_relaxed)->data;
         return true;
     }
     
     template <typename T> bool lockfree_spsc_unbounded<T>::empty() {
-        if(head->next.load(std::memory_order_acquire)==nullptr)
-            return false;
+        if(head.load(std::memory_order_relaxed)->next.load(std::memory_order_relaxed)==nullptr)
+            return true;
         
-        return true;
+        return false;
     }
 
     template <typename T> size_t lockfree_spsc_unbounded<T>::size() {
@@ -71,7 +75,7 @@ namespace tsfqueue::__impl {
         prev_tail->next.store(new_node, std::memory_order_release); 
 
         capacity.fetch_add(1, std::memory_order_relaxed);
-        tail=new_node;
+        tail.store(new_node, std::memory_order_relaxed);
     }
 }
 

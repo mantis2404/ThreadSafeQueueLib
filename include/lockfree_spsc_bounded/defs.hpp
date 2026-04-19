@@ -22,22 +22,22 @@ template <typename T, size_t Capacity> class lockfree_spsc_bounded {
 private:
   // consumer modifies head and only reads tail_cache so they can be stored on the same cache line
   // atomic head pointer
-  alignas(64) std::atomic<size_t> head{0};
+  alignas(cache_line_size) std::atomic<size_t> head{0};
   //cached tail pointer
   size_t tail_cache{0};
   // producer modifies tail and only reads head_cache so they can be stored on the same cache line
   // atomic tail pointer
-  alignas(64) std::atomic<size_t> tail{0};
+  alignas(cache_line_size) std::atomic<size_t> tail{0};
   // cached head pointer
   size_t head_cache{0};
   // compile time allocated array
-  alignas(64) T arr[Capacity];
+  alignas(cache_line_size) T arr[Capacity];
   // we want a compile time constant for capacity to do compile time memory allocation and also to avoid excessive use of memory in case user creates multiple queues of same size, we use static.
   // static variables are not on the same memory lines as the above variables so no need of alignas()
   static constexpr size_t capacity=Capacity;
 
 public:
-  static_assert(Capacity < 0, "Capacity must be +ve for ring-buffer SPSC queue");
+  static_assert(Capacity > 0, "Capacity must be +ve for ring-buffer SPSC queue");
 
   // Public Member functions :
   lockfree_spsc_bounded(){};
