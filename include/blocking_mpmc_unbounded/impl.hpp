@@ -3,130 +3,139 @@
 
 #include "defs.hpp"
 
-template <typename T>
-using queue = tsfqueue::__impl::blocking_mpmc_unbounded<T>;
+namespace tsfqueue::__impl{
+    template <typename T> void blocking_mpmc_unbounded<T>::push(T value) {
+        // made the new node unique_ptr 
+        std::unique_ptr<node> new_node=std::make_unique<node>();
+        // the data is made shared_ptr to avoid crashes
+        std::shared_ptr<T> data=std::make_shared<T>(std::move(value));
 
-template <typename T>
-void queue<T>::push(T value)
-{
-    static_assert(
-        std::is_copy_constructible_v<T> || std::is_move_constructible_v<T>,
-        "T must be copy or move constructible.");
-    emplace_back(std::move(value));
-}
+        // lock the tail mutex so that only this thread can modify
+        std::lock_guard<std::mutex> tail_lock(tail_mutex);
 
-template <typename T>
-queue<T>::node *queue<T>::get_tail()
-{
-    std::lock_guard<std::mutex> lock(tail_mutex);
-    return tail;
-}
+        tail->data=std::move(data);
+        tail->next=std::move(new_node);
 
-template <typename T>
-std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get()
-{
-    std::unique_lock<std::mutex> lock(head_mutex);
-    cond.wait(lock, [this]()
-              { return head.get() != get_tail(); });
-    std::unique_ptr<node>
-        pre_head = std::move(head);
-    head = std::move(pre_head->next);
-    size_q.fetch_sub(1, std::memory_order_relaxed);
-    return pre_head;
-}
+        // tail=tail->next will throw errors due to ownership issues of unique_ptr
+        // .get() gives the normal pointer to the new node and we can safely move tail to it
+        tail=tail->next.get();
 
-template <typename T>
-std::unique_ptr<typename queue<T>::node> queue<T>::try_get()
-{
-    std::lock_guard<std::mutex> lock(head_mutex);
-    if (head.get() == get_tail())
-        return nullptr;
-    else
-    {
-        std::unique_ptr<node> pre_head = std::move(head);
-        head = std::move(pre_head->next);
-        size_q.fetch_sub(1, std::memory_order_relaxed);
-        return pre_head;
+        // can also do artificial scope to avoid locking the size_mutex for too long, but here since we return just after this, it is not necessary
+        {
+            std::lock_guard<std::mutex> size_lock(size_mutex);
+            size_++;
+        }
+        // notify one thread that is waiting on the condition variable that new data is available
+        cond.notify_one();
+
+        return;
     }
-}
 
-template <typename T>
-void queue<T>::wait_and_pop(T &value)
-{
-    static_assert(
-        std::is_copy_constructible_v<T> || std::is_move_constructible_v<T>,
-        "T must be copy or move constructible.");
-    std::unique_ptr<node> pop_node = wait_and_get();
-    value = *pop_node->data;
-}
+    template <typename T> template <typename... Args>
+    void blocking_mpmc_unbounded<T>::emplace_back(Args &&...args) {
+        std::unique_ptr<node> new_node=std::make_unique<node>();
+        std::shared_ptr<T> data=std::make_shared<T>(std::forward<Args>(args)...);
 
-template <typename T>
-std::shared_ptr<T> queue<T>::wait_and_pop()
-{
-    std::unique_ptr<node> pop_node = wait_and_get();
-    return pop_node->data;
-}
+        std::lock_guard<std::mutex> tail_lock(tail_mutex);
+        tail->data=std::move(data);
+        tail->next=std::move(new_node);
+        tail=tail->next.get();
 
-template <typename T>
-bool queue<T>::try_pop(T &value)
-{
-    static_assert(
-        std::is_copy_constructible_v<T> || std::is_move_constructible_v<T>,
-        "T must be copy or move constructible.");
-    std::unique_ptr<node> pop_node = try_get();
-    if (pop_node == nullptr)
-    {
+        std::lock_guard<std::mutex> size_lock(size_mutex);
+        size_++;
+
+        cond.notify_one();
+        return;
+    }
+    
+    template <typename T> typename blocking_mpmc_unbounded<T>::node *blocking_mpmc_unbounded<T>::get_tail() {
+        // using the tail mutex only to safely get the tail pointer
+        std::lock_guard<std::mutex> tail_lock(tail_mutex);
+
+        return tail;
+    }
+    
+    template <typename T>
+    std::unique_ptr<typename blocking_mpmc_unbounded<T>::node> blocking_mpmc_unbounded<T>::wait_and_get() {
+        // unique lock is needed for the condition variable
+        std::unique_lock<std::mutex> head_lock(head_mutex);
+
+        // waiting using condition variable and not using a while loop as mpmc requires efficient use of CPU
+        cond.wait(head_lock, [this](){return !empty();});
+
+        std::unique_ptr<node> old_head=std::move(head);
+        // unique_ptr is non copyable but movable, hence std::move
+        head=std::move(old_head->next);
+        
+        std::lock_guard<std::mutex> size_lock(size_mutex);
+        size_--;
+
+        return old_head;
+    }
+    
+    template <typename T> std::unique_ptr<typename blocking_mpmc_unbounded<T>::node> blocking_mpmc_unbounded<T>::try_get() {
+        std::lock_guard<std::mutex> head_lock(head_mutex);
+        // checking only once if empty or not
+        if(head.get()!=get_tail()){
+            std::unique_ptr<node> old_head=std::move(head);
+            head=std::move(old_head->next);
+
+            std::lock_guard<std::mutex> size_lock(size_mutex);
+            size_--;
+
+            return old_head;
+        }
+
+        return nullptr;
+    }
+    
+    template <typename T> void blocking_mpmc_unbounded<T>::wait_and_pop(T &value) {
+        std::unique_ptr<node> old_head=wait_and_get();
+        // cannot use *(old_head->data) as data is a shared_ptr, we need to dereference the shared_ptr,which gives a unique_pt which is not copyable
+        value=std::move(*(old_head->data));
+    }
+    
+    template <typename T> std::shared_ptr<T> blocking_mpmc_unbounded<T>::wait_and_pop() {
+        // get the unique_ptr to the popped node
+        std::unique_ptr<node> old_head=wait_and_get();
+
+        // node->data is a shared_ptr by definition
+        return old_head->data;
+    }
+    
+    template <typename T> bool blocking_mpmc_unbounded<T>::try_pop(T &value) {
+        // get the unique_ptr to the popped node
+        std::unique_ptr<node> old_head=try_get();
+
+        if(old_head!=nullptr){
+            // cannot use *(old_head->data) as data is a shared_ptr, we need to dereference the shared_ptr,which gives a unique_pt which is not copyable
+            value=std::move(*(old_head->data));
+            return true;
+        }
+        
         return false;
     }
-    else
-    {
-        value = *pop_node->data;
-        return true;
-    }
-}
+    
+    template <typename T> std::shared_ptr<T> blocking_mpmc_unbounded<T>::try_pop() {
+        // get the unique_ptr to the popped node
+        std::unique_ptr<node> old_head=try_get();
 
-template <typename T>
-std::shared_ptr<T> queue<T>::try_pop()
-{
-    std::unique_ptr<node> pop_node = try_get();
-    if (pop_node == nullptr)
-    {
+        if(old_head!=nullptr){
+            return old_head->data;
+        }
+
         return nullptr;
     }
-    else
-    {
-        return pop_node->data;
+    
+    template <typename T> bool blocking_mpmc_unbounded<T>::empty() {
+        std::lock_guard<std::mutex> size_lock(size_mutex);
+        return size_==0;
     }
-}
 
-template <typename T>
-bool queue<T>::empty()
-{
-    std::lock_guard<std::mutex> l1(head_mutex);
-    std::lock_guard<std::mutex> l2(tail_mutex);
-    return head.get() == tail;
-}
-
-template <typename T>
-size_t queue<T>::size()
-{
-    return size_q.load(std::memory_order_relaxed);
-}
-
-template <typename T>
-template <typename... Args>
-void queue<T>::emplace_back(Args &&...args)
-{
-    std::unique_ptr<node> new_tail = std::make_unique<node>();
-    std::shared_ptr<T> data = std::make_shared<T>(std::forward<Args>(args)...);
-    {
-        std::lock_guard<std::mutex> lock(tail_mutex);
-        tail->data = std::move(data);
-        tail->next = std::move(new_tail);
-        tail = tail->next.get();
-        size_q.fetch_add(1, std::memory_order_relaxed);
+    template <typename T> size_t blocking_mpmc_unbounded<T>::size() {
+        std::lock_guard<std::mutex> size_lock(size_mutex);
+        return size_;
     }
-    cond.notify_one();
 }
 
 #endif
