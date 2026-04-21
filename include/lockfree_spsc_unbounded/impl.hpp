@@ -63,8 +63,7 @@ namespace tsfqueue::__impl {
         return capacity.load(std::memory_order_relaxed);
     }
 
-    template <typename T>
-    template <typename... Args>
+    template <typename T> template <typename... Args>
     void lockfree_spsc_unbounded<T>::emplace_back(Args&&... args) {
     
         node* new_node=new node();
