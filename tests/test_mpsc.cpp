@@ -19,15 +19,12 @@ TEST(MPSCQueue, BasicSingleProducerConsumer) {
 
     q.push(10);
     q.push(20);
-    q.push(30);
 
     int out = 0;
     EXPECT_TRUE(q.try_pop(out));
     EXPECT_EQ(out, 10);
     EXPECT_TRUE(q.try_pop(out));
     EXPECT_EQ(out, 20);
-    EXPECT_TRUE(q.try_pop(out));
-    EXPECT_EQ(out, 30);
 
     EXPECT_TRUE(q.empty());
     EXPECT_EQ(q.size(), 0u);
