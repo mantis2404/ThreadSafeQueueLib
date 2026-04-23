@@ -32,14 +32,15 @@ namespace tsfqueue::__impl {
     template <typename T>
     void lockfree_spsc_unbounded<T>::wait_and_pop(T &value) {
         node* curr_head=head.load(std::memory_order_relaxed);
-        node* new_head=nullptr;
+        node* next_head=nullptr;
 
-        while(new_head==nullptr){
-            new_head=head.load(std::memory_order_relaxed)->next.load(std::memory_order_acquire);
+        while(next_head==nullptr){
+            next_head=head.load(std::memory_order_relaxed)->next.load(std::memory_order_acquire);
         }
             
+        value=next_head->data;
         delete curr_head;
-        head.store(new_head, std::memory_order_relaxed);
+        head.store(next_head, std::memory_order_relaxed);
         capacity.fetch_sub(1, std::memory_order_relaxed);
     }
     
