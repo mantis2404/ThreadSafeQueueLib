@@ -17,11 +17,14 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(test_spsc tests/test_spsc.cpp)
 add_executable(test_mpmc tests/test_mpmc.cpp)
+add_executable(test_mpsc tests/test_mpsc.cpp)
 
 find_package(Threads REQUIRED)
 target_link_libraries(test_spsc PRIVATE gtest_main Threads::Threads)
 target_link_libraries(test_mpmc PRIVATE gtest_main Threads::Threads)
+target_link_libraries(test_mpsc PRIVATE gtest_main Threads::Threads)
 
 include(GoogleTest)
 gtest_discover_tests(test_spsc)
 gtest_discover_tests(test_mpmc)
+gtest_discover_tests(test_mpsc)
