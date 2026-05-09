@@ -10,6 +10,7 @@ namespace tsfqueue::__impl{
         while(true){
             size_t seq = buffer_arr[curr_tail%capacity].sequence.load(std::memory_order_acquire);
             
+            // calculating the diff once only so that grabbing sequence multiple times does not cause a race condition
             intptr_t diff=(intptr_t)seq-(intptr_t)curr_tail;
             // we utilize 100% capacity of the buffer and check the seq no. for every slot
             // if seq no. < pos -> already filled, queue is full
@@ -26,6 +27,8 @@ namespace tsfqueue::__impl{
 
                     return true;
                 }
+                // If CAS fails, curr_tail is updated automatically
+
             }
             if(diff>0){
                 // another producer filled it, retry
@@ -40,7 +43,6 @@ namespace tsfqueue::__impl{
     }
 
     template <typename T, size_t Capacity> void lockfree_mpmc_bounded<T, Capacity>::wait_and_push(T value) {
-        size_t curr_tail=tail.load(std::memory_order_acquire);
         while(true){
             if(try_push(value))
                 break;
@@ -48,16 +50,52 @@ namespace tsfqueue::__impl{
         }
     }
     
-    template <typename T, size_t Capacity> void lockfree_mpmc_bounded<T, Capacity>::wait_and_pop(T &value) {
-
-    }
-    
     template <typename T, size_t Capacity> bool lockfree_mpmc_bounded<T, Capacity >::try_pop(T &value) {
-    
+        size_t curr_head=head.load(std::memory_order_acquire);
+        while(true){
+            size_t seq = buffer_arr[curr_head%capacity].sequence.load(std::memory_order_acquire);
+            
+            // calculating the diff once only so that grabbing sequence multiple times does not cause a race condition
+            intptr_t diff=(intptr_t)seq-(intptr_t)(curr_head+1);
+            // we utilize 100% capacity of the buffer and check the seq no. for every slot
+            // if seq no. < pos+1 -> already popped, queue is empty
+            // if seq no. == pos+1 -> can be popped
+            // if seq no. > pos+1 -> another consumer popped it, retry
+
+            if(diff==0){
+                // element available for pop
+                if(head.compare_exchange_weak(curr_head, curr_head+1, std::memory_order_relaxed, std::memory_order_relaxed)){
+                    // it can be the case that another thread might start writing the new data on the updated tail even before the current thread has completed writing data on its tail
+                    value=std::move(buffer_arr[curr_head%capacity].data);
+                    // make it ready for the next lap
+                    buffer_arr[curr_head%capacity].sequence.store(curr_head+capacity,std::memory_order_release);
+                    
+                    return true;
+                }
+                // If CAS fails, curr_head is updated automatically
+            }
+            if(diff>0){
+                // another consumer popped it and made it available for the next lap, retry
+                curr_head=head.load(std::memory_order_acquire);
+            }
+            if(diff<0){
+                // queue is empty
+               return false;
+            }           
+        }
+        return false;
     }
     
-    template <typename T, size_t Capacity> bool lockfree_mpmc_bounded<T, Capacity>::empty() {
+    template <typename T, size_t Capacity> void lockfree_mpmc_bounded<T, Capacity>::wait_and_pop(T &value) {
+        while(true){
+            if(try_pop(value))
+                break;
+            std::this_thread::yield(); // brief yield to reduce CPU burn while spinning
+        }
+    }
 
+    template <typename T, size_t Capacity> bool lockfree_mpmc_bounded<T, Capacity>::empty() {
+        
     }
 
     template <typename T, size_t Capacity> size_t lockfree_mpmc_bounded<T, Capacity>::size() {
