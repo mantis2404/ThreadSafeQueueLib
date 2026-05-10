@@ -95,11 +95,10 @@ namespace tsfqueue::__impl{
     }
 
     template <typename T, size_t Capacity> bool lockfree_mpmc_bounded<T, Capacity>::empty() {
-        
-    }
+        size_t curr_head=head.load(std::memory_order_acquire);
+        size_t seq=buffer_arr[curr_head%capacity].sequence.load(std::memory_order_acquire);
 
-    template <typename T, size_t Capacity> size_t lockfree_mpmc_bounded<T, Capacity>::size() {
-
+        return seq<(curr_head+1);
     }
 }
 

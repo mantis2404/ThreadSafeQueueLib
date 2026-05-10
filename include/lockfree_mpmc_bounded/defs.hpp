@@ -32,7 +32,7 @@ namespace tsfqueue::__impl
     // atomic tail pointer
     alignas(cache_line_size) std::atomic<size_t> tail{0};
     // creating a ring buffer through custom vector of buffer storing the data and sequence number
-    alignas(cache_line_size) std::vector<buffer> buffer_arr;
+    alignas(cache_line_size) std::unique_ptr<buffer[]> buffer_arr;
     // we want a compile time constant for capacity to do compile time memory allocation and also to avoid excessive use of memory in case user creates multiple queues of same size, we use static.
     // static variables are not on the same memory lines as the above variables so no need of alignas()
     static constexpr size_t capacity=Capacity;
@@ -40,10 +40,11 @@ namespace tsfqueue::__impl
   public:
     // Public member functions :
     // Add relevant constructors and destructors -> Add these here only
-    lockfree_mpmc_bounded(){
-        // we initialize the buffer array with the sequence numbers as per the index of the buffer
-        for(size_t i=0;i<capacity;i++){
-            buffer_arr.push_back({T(), i});
+    // used array as vector requrie copyable/movable type and we used atomic variable in our struct
+    lockfree_mpmc_bounded() : buffer_arr(new buffer[capacity]) {
+        for (size_t i=0; i<capacity;i++) {
+            buffer_arr[i].data = T();
+            buffer_arr[i].sequence.store(i,std::memory_order_relaxed);
         }
     }
     ~lockfree_mpmc_bounded()=default;
