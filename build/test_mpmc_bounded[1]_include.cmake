@@ -1,5 +1,0 @@
-if(EXISTS "/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_mpmc_bounded[1]_tests.cmake")
-  include("/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_mpmc_bounded[1]_tests.cmake")
-else()
-  add_test(test_mpmc_bounded_NOT_BUILT test_mpmc_bounded_NOT_BUILT)
-endif()

@@ -1,5 +1,0 @@
-if(EXISTS "/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_spsc[1]_tests.cmake")
-  include("/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_spsc[1]_tests.cmake")
-else()
-  add_test(test_spsc_NOT_BUILT test_spsc_NOT_BUILT)
-endif()
