@@ -1,7 +1,6 @@
 # ThreadSafeQueueLib
 
 ThreadSafeQueueLib is a header-only C++ queue library for safe communication between threads.
-
 It gives you multiple queue designs so you can pick the right trade-off between latency, blocking behavior, and producer/consumer topology.
 
 ## Why this project is useful
@@ -34,8 +33,7 @@ ThreadSafeQueueLib/
 │   ├── lockfree_spsc_unbounded/       # Lock-free unbounded SPSC queue
 │   ├── lockfree_mpsc_unbounded/       # Lock-free unbounded MPSC queue
 │   ├── lockfree_mpmc_bounded/         # Lock-free bounded MPMC queue
-│   ├── blocking_mpmc_unbounded/       # Blocking unbounded MPMC queue
-│   └── FAST_lockfree_spsc_unbounded/  # Experimental fast SPSC implementation
+│   └── blocking_mpmc_unbounded/       # Blocking unbounded MPMC queue
 ├── tests/
 │   ├── test_spsc.cpp
 │   ├── test_mpsc.cpp
