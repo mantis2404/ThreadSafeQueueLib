@@ -57,6 +57,8 @@ ThreadSafeQueueLib/
 - `tsfqueue::__impl::lockfree_mpmc_bounded<T, Capacity>`
 - `tsfqueue::__impl::blocking_mpmc_unbounded<T>`
 
+For the latest public include/namespace usage, always verify `include/tsfqueue.hpp` and corresponding headers in `include/`.
+
 ## Quick start
 
 ### 1) Build tests
