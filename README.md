@@ -17,7 +17,7 @@ When multiple threads share data, writing your own queue can easily introduce ra
 ## Key features
 
 - Header-only API in `include/`
-- C++17 compatible (as configured in CMake)
+- Current CMake configuration uses **C++17**
 - Queue operations such as `try_push`, `try_pop`, `wait_and_push`, `wait_and_pop`, `push`, `peek`, and `size` (availability depends on queue type)
 - Stress-tested with GoogleTest-based concurrent tests
 
@@ -89,5 +89,5 @@ ctest --test-dir build --output-on-failure
 
 ## Notes
 
-- Most queue classes currently live under `tsfqueue::__impl`.
+- Most queue classes currently live under `tsfqueue::__impl`, which is an implementation namespace and may evolve over time.
 - The library is header-only, so no separate library linking step is required for usage.
