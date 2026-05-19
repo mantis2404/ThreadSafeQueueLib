@@ -40,7 +40,7 @@ ThreadSafeQueueLib/
 │   ├── test_mpmc.cpp
 │   └── test_mpmc_bounded.cpp
 ├── examples/
-│   └── examples.md                    # Placeholder for usage examples
+│   └── examples.md                    # Usage examples
 └── benchmarking/
     ├── bench_mpmc.cpp                 # MPMC queue benchmarks
     ├── bench_mpsc.cpp                 # MPSC queue benchmarks
