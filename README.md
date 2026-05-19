@@ -42,7 +42,10 @@ ThreadSafeQueueLib/
 ├── examples/
 │   └── examples.md                    # Placeholder for usage examples
 └── benchmarking/
-    └── benchmark.md                   # Placeholder for benchmarks
+    ├── bench_mpmc.cpp                 # MPMC queue benchmarks
+    ├── bench_mpsc.cpp                 # MPSC queue benchmarks
+    ├── bench_spsc.cpp                 # SPSC queue benchmarks
+    └── benchmark.md                   # Benchmark results and usage guide
 ```
 
 > Empty folders are intentionally ignored in this layout.
@@ -80,6 +83,20 @@ ctest --test-dir build --output-on-failure
 - If many producers and many consumers share work: use **MPMC**.
 - If memory usage must be strictly controlled: use a **bounded** queue.
 - If you prefer backpressure via blocking calls: use a queue with `wait_and_*` operations.
+
+### 4) Run benchmarks
+
+```bash
+# Configure in Release mode for accurate numbers
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target benchmarks -j$(nproc)
+
+# Run specific benchmark suites
+./build/bench_spsc
+./build/bench_mpmc
+./build/bench_mpsc
+```
+For detailed results and usage flags, see [benchmarking/benchmark.md](benchmarking/benchmark.md).
 
 ## How it helps beginners
 
