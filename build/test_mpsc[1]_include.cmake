@@ -1,0 +1,5 @@
+if(EXISTS "/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_mpsc[1]_tests.cmake")
+  include("/home/runner/work/ThreadSafeQueueLib/ThreadSafeQueueLib/build/test_mpsc[1]_tests.cmake")
+else()
+  add_test(test_mpsc_NOT_BUILT test_mpsc_NOT_BUILT)
+endif()

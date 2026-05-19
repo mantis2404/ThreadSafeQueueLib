@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/test_mpmc.dir/link.d CMakeFiles/test_mpmc.dir/tests/test_mpmc.cpp.o -o test_mpmc  lib/libgtest_main.a lib/libgtest.a

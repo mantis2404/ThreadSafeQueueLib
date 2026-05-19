@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/test_spsc.dir/link.d CMakeFiles/test_spsc.dir/tests/test_spsc.cpp.o -o test_spsc  lib/libgtest_main.a lib/libgtest.a
